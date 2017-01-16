@@ -7,7 +7,7 @@ import re
 
 from collections import namedtuple
 from collections import Counter
-from fei.model.utils import getLogger
+from utils import getLogger
 
 logger = getLogger()
 
@@ -22,17 +22,17 @@ class AmrNode(object):
         self.short_hnd = short_hnd
         self.concept = concept
         self.sources = [] # list of NodeSource
-        
+
     def __repr__(self):
         return '%s %s %s' % (self.graph_idx, self.short_hnd, self.concept)
-    
+
     def toString(self):
         """
         convert AmrNode to string, include full node information
         """
         node_info = []
         if self.concept: node_info.append('[concept]: %s' % self.concept)
-        
+
         if self.sources: # omit sentence info
             for idx, source in enumerate(self.sources):
                 if source.graph_idx: node_info.append('[source_id]: %d [graph_idx]: %s' % (idx, source.graph_idx))
@@ -41,9 +41,9 @@ class AmrNode(object):
                 if source.word_str: node_info.append('[source_id]: %d [word_str]: %s' % (idx, source.word_str))
                 if source.filename: node_info.append('[source_id]: %d [filename]: %s' % (idx, source.filename))
                 if source.line_num: node_info.append('[source_id]: %d [line_num]: %d' % (idx, source.line_num))
-                
+
         # final string
-        return '\n'.join(node_info) 
+        return '\n'.join(node_info)
 
 
 class AmrEdge(object):
@@ -53,27 +53,27 @@ class AmrEdge(object):
         self.relation = relation
         self.sources = [] # list of EdgeSource
         return
-    
+
     def __repr__(self):
         return '%s (%s)-> %s' % (self.node1.short_hnd, self.relation, self.node2.short_hnd)
-    
+
     def toString(self):
         """
         convert AmrEdge to string, include full edge information
         """
         edge_info = []
-        if self.node1: 
+        if self.node1:
             if self.node1.concept: edge_info.append('[node1_concept]: %s' % self.node1.concept)
         if self.node2:
             if self.node2.concept: edge_info.append('[node2_concept]: %s' % self.node2.concept)
-            
+
         if self.sources: # omit sentence info
             for idx, source in enumerate(self.sources):
                 if source.relation: edge_info.append('[source_id]: %d [relation]: %s' % (idx, source.relation))
                 if source.filename: edge_info.append('[source_id]: %d [filename]: %s' % (idx, source.filename))
                 if source.line_num: edge_info.append('[source_id]: %d [line_num]: %d' % (idx, source.line_num))
-                
-        # final string            
+
+        # final string
         return '\n'.join(edge_info)
 
 class CompareAmrEdge(object):
@@ -82,14 +82,14 @@ class CompareAmrEdge(object):
     """
     def __init__(self, edge):
         self.edge = edge
-    
+
     def __hash__(self):
         return hash(tuple(sorted([self.edge.node1.concept, self.edge.node2.concept]) + [self.edge.relation]))
-    
+
     def __eq__(self, other):
         if type(other) == type(self):
             if other.edge.relation == self.edge.relation:
-                if ((other.edge.node1.concept == self.edge.node1.concept 
+                if ((other.edge.node1.concept == self.edge.node1.concept
                      and other.edge.node2.concept == self.edge.node2.concept)
                     or (other.edge.node1.concept == self.edge.node2.concept
                         and other.edge.node2.concept == self.edge.node1.concept)):
@@ -98,7 +98,7 @@ class CompareAmrEdge(object):
 
     def __ne__(self, other):
         return not self.__eq__(other)
-    
+
     def __repr__(self):
         return self.edge.__repr__()
 
@@ -109,13 +109,13 @@ class CompareAmrEdgeWoRel(object):
     """
     def __init__(self, edge):
         self.edge = edge
-    
+
     def __hash__(self):
         return hash(tuple(sorted([self.edge.node1.concept, self.edge.node2.concept])))
-    
+
     def __eq__(self, other):
         if type(other) == type(self):
-            if ((other.edge.node1.concept == self.edge.node1.concept 
+            if ((other.edge.node1.concept == self.edge.node1.concept
                  and other.edge.node2.concept == self.edge.node2.concept)
                 or (other.edge.node1.concept == self.edge.node2.concept
                     and other.edge.node2.concept == self.edge.node1.concept)):
@@ -132,7 +132,7 @@ class CompareAmrEdgeWoRel(object):
 class AmrGraph(object):
     def __init__(self):
         return
-    
+
     def getNodes(self, tokens):
         """
         obtain a set of nodes from an AMR graph.
@@ -141,7 +141,7 @@ class AmrGraph(object):
         nodes, curr_idx = self._getNodesIter(None, tokens[:], 0) # copy tokens
         assert curr_idx == len(tokens)
         return [node for node in self._flatten(nodes)]
-    
+
     def getEdges(self, tokens):
         """
         obtain a set of edges from an AMR graph.
@@ -149,27 +149,27 @@ class AmrGraph(object):
         """
         # get nodes
         nodes = self.getNodes(tokens)
-        
+
         # index nodes by short_hnd
         node_indices = {}
         for node in nodes:
             short_hnd = node.short_hnd
             node_indices.setdefault(short_hnd, node)
-        
+
         # get edges
         edges, curr_idx = self._getEdgesIter(None, tokens[:], 0, node_indices) # copy tokens
         assert curr_idx == len(tokens)-1 or curr_idx == len(tokens)
-        
+
         # share nodes across edges
         for edge in edges:
             curr_short_hnd = edge.node1.short_hnd
             if curr_short_hnd in node_indices:
                 edge.node1 = node_indices[curr_short_hnd]
-            
+
             curr_short_hnd = edge.node2.short_hnd
             if curr_short_hnd in node_indices:
                 edge.node2 = node_indices[curr_short_hnd]
-        
+
         return edges
 
     def _flatten(self, curr_list):
@@ -189,14 +189,14 @@ class AmrGraph(object):
         each node represents a concept.
         """
         nodes = [] # list of nodes
-        
+
         while curr_idx < len(tokens):
             t = tokens[curr_idx]
 
             if t.endswith(')'):
                 tokens[curr_idx] = t[:-1]
                 return (nodes, curr_idx)
-            
+
             elif t.startswith('('):
                 curr_node = AmrNode()
                 curr_node.short_hnd = t[1:]
@@ -205,24 +205,24 @@ class AmrGraph(object):
                 curr_graph_idx = str(len(nodes)) if not graph_idx else graph_idx + '.' + str(len(nodes))
                 curr_node.graph_idx = curr_graph_idx
                 nodes.append([curr_node])
-                
+
                 # recursion
                 new_nodes, new_idx = self._getNodesIter(curr_graph_idx, tokens, curr_idx)
                 if new_nodes: nodes.append(nodes.pop() + new_nodes)
                 curr_idx = new_idx
-                
-            else: 
+
+            else:
                 curr_idx += 1
-        
+
         return nodes, curr_idx
-    
+
     def _getEdgesIter(self, curr_node, tokens, curr_idx, node_indices):
         """
         obtain a set of edges from an AMR graph.
         each edge connects two concepts.
         """
         edges = [] # list of edges
-        
+
         while curr_idx < len(tokens):
             t = tokens[curr_idx]
 
@@ -231,19 +231,19 @@ class AmrGraph(object):
                 curr_node = AmrNode()
                 curr_node.short_hnd = t[1:]
                 curr_idx += 2
-                    
+
             elif t.endswith(')'):
                 tokens[curr_idx] = t[:-1]
                 return (edges, curr_idx)
-                
+
             elif t.startswith(':'):
                 curr_edge = AmrEdge()
                 curr_edge.node1 = curr_node
                 curr_edge.relation = t[1:]
                 curr_idx += 1
-                
+
                 new_t = re.sub(r'\)+$', '', tokens[curr_idx])
-                
+
                 # get second node for current edge
                 # second node is a new concept
                 if new_t.startswith('('):
@@ -252,21 +252,21 @@ class AmrGraph(object):
                     curr_edge.node2 = new_node
                     edges.append(curr_edge)
                     curr_idx += 2
-                    
+
                     # recursion
                     new_edges, new_idx = self._getEdgesIter(new_node, tokens, curr_idx, node_indices)
                     if new_edges: edges.extend(new_edges)
                     curr_idx = new_idx
-                
+
                 # second node refers to an old concept (no recursion)
                 elif new_t in node_indices:
                     new_node = node_indices[new_t]
                     curr_edge.node2 = new_node
                     edges.append(curr_edge)
-                
-            else: 
+
+            else:
                 curr_idx += 1
-        
+
         return edges, curr_idx
 
     def getCollapsedNodesAndEdges(self, tokens):
@@ -276,32 +276,32 @@ class AmrGraph(object):
         """
         # get nodes
         nodes = self.getNodes(tokens)
-        
+
         # index nodes by short_hnd
         node_indices = {}
         for node in nodes:
             short_hnd = node.short_hnd
             node_indices.setdefault(short_hnd, node)
-        
+
         # get edges
         edges, curr_idx = self._getEdgesIter(None, tokens[:], 0, node_indices) # copy tokens
         assert curr_idx == len(tokens)-1 or curr_idx == len(tokens)
-        
+
         # share nodes across edges
         for edge in edges:
             curr_short_hnd = edge.node1.short_hnd
             if curr_short_hnd in node_indices:
                 edge.node1 = node_indices[curr_short_hnd]
-    
+
             curr_short_hnd = edge.node2.short_hnd
             if curr_short_hnd in node_indices:
                 edge.node2 = node_indices[curr_short_hnd]
-        
+
         # collapse "name" and "date-entity" concepts
         curr_short_hnd = None
         curr_concept = ''
         start_collapse = False
-        
+
         for i, t in enumerate(tokens):
             # nested concepts may exist, re-start collapsing
             if t.startswith('('):
@@ -309,24 +309,24 @@ class AmrGraph(object):
                 start_collapse = False
                 curr_short_hnd = t[1:]
                 continue
-            
+
             # assume "name" and "date-entity" do not contain nested concepts
             # if this is not the case, collapse process needs to be rewritten
             if (t == 'name' or t == 'date-entity') and tokens[i-1] == '/':
                 start_collapse = True
                 curr_concept = t # original concept
                 continue
-            
+
             if start_collapse == True:
                 # remove ending brackets, concatenate tokens
                 t_clean = re.sub(r'\)+$', '', t)
                 curr_concept = '%s_%s' % (curr_concept, t_clean)
-                    
-                if t.endswith(')'): 
+
+                if t.endswith(')'):
                     node_indices[curr_short_hnd].concept = curr_concept
                     curr_concept = ''
                     start_collapse = False
-        
+
         # count node occurrences
         node_counts = Counter()
         for edge in edges:
@@ -345,9 +345,9 @@ class AmrGraph(object):
 
         # in-place removal of collapsed nodes ("name" as relation)
         nodes[:] = [node for node in nodes if node.short_hnd in node_indices]
-                            
+
         return nodes, new_edges
-  
+
 if __name__ == '__main__':
 
     graph_string = '''
@@ -364,7 +364,7 @@ if __name__ == '__main__':
                             :ARG1 (c / country :name (n2 / name :op1 "US"))
                             :time (d2 / date-entity :year 2001 :month 9)))))
     '''
-    
+
     graph_string = '''
     (l / likely
         :polarity -
@@ -387,7 +387,7 @@ if __name__ == '__main__':
                                                         :op1 "North"
                                                         :op2 "Korea"))))))
     '''
-  
+
     graph_string = '''
     (s / schedule-01
         :ARG1 (p / project
@@ -399,7 +399,7 @@ if __name__ == '__main__':
         :ARG3 (d2 / date-entity
             :year 2003))
     '''
-  
+
     graph_string = '''
     (a2 / and
           :op1 (c2 / cross-02
@@ -415,7 +415,7 @@ if __name__ == '__main__':
                             :part-of n4
                             :part-of (c5 / country :name (n5 / name :op1 "India"))))))
     '''
-  
+
     graph_string = '''
     (s / say-01
           :ARG0 (m2 / military :name (n / name :op1 "Russian" :op2 "Spaces" :op3 "Forces"))
@@ -434,20 +434,19 @@ if __name__ == '__main__':
                             :mod (n2 / news
                                   :mod (m3 / military))))))
     '''
-  
+
     g = AmrGraph()
     tokens = graph_string.split()
 
-    nodes, edges = g.getCollapsedNodesAndEdges(tokens)    
-    print 
+    nodes, edges = g.getCollapsedNodesAndEdges(tokens)
+    print
     for node in nodes: print node
     print
     for edge in edges: print '%s (%s)-> %s' % (edge.node1, edge.relation, edge.node2)
-    
 
 
 
 
 
-    
-    
+
+
