@@ -14,6 +14,38 @@ logger = getLogger()
 
 Instance = namedtuple('Instance', 'filename, nodes, edges, gold')
 
+class GlobalNodeEdgeInfo(object):
+    def __init__(self):
+        return
+
+class NodeProperties(object):
+    def __init__(self):
+        self.adjacency_list = []
+        self.is_root = False
+        return
+
+class TextGraph(object):
+    def __init__(self):
+        return
+
+    def createGraph(self, edge_list, nodes):
+        self.graph = {}
+        self.roots = []
+
+        # update adjacency list
+        for k_edge, v_edge in edge_list.iteritems():
+            if k_edge[0] not in self.graph:
+                self.graph[k_edge[0]] = NodeProperties()
+            self.graph[k_edge[0]].adjacency_list.append(k_edge[1])
+
+        all_nodes, _, root_nodes = nodes
+
+        #update root nodes
+        for r_node in root_nodes:
+            if r_node[0] not in self.graph:
+                self.graph[r_node[0]] = NodeProperties()
+            self.graph[r_node[0]].is_root = True
+
 def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
     """
     build corpus and write it to file
@@ -36,28 +68,31 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
             total_body_nodes += len(my_nodes)
             total_body_edges += len(my_edges)
 
-            # print s_nodes
-            # print s_edges
             print "file info ........................................."
             print curr_filename
             print "root nodes :: " + str(len(r_nodes))
-            print r_nodes
-            print my_nodes
-
-
 
             outfile.write('%s\n' % curr_filename)
             for k_node, v_node in my_nodes.iteritems():
                 tag = 0
+                # print k_node
                 if k_node in s_nodes:
                     tag = 1
                 outfile.write('%d %s %s\n' % (tag, k_node, v_node))
 
             for k_edge, v_edge in my_edges.iteritems():
                 tag = 0
+                # print v_edge
+                # print k_edge[0]
                 if k_edge in s_edges:
                     tag = 1
                 outfile.write('%d %s %s\n' % (tag, k_edge, v_edge))
+
+            tGraph = TextGraph()
+            # print type(my_nodes)
+            # return
+            tGraph.createGraph(my_edges, inst.nodes)
+            return
 
     # total selected nodes and edges
     logger.debug('[total_s_nodes]: %d' % total_s_nodes)
@@ -74,13 +109,9 @@ def buildCorpus(body_file, summ_file, w_exp=False):
     logger.debug('building corpus [summ file]: %s' % summ_file)
 
     corpus = []
-    # print "body ----------------------------------------------------------------------- "
     body_corpus = loadFile(body_file)
-    # print "body ends ------------------------------------------------------------------- "
-    # print "summary starts ---------------------------------------------------------------"
     summ_corpus = loadFile(summ_file)
-    # print "summary ends -----------------------------------------------------------------"
-    # print summ_corpus
+
     for curr_filename in body_corpus:
         print curr_filename
         # sanity check
@@ -93,10 +124,6 @@ def buildCorpus(body_file, summ_file, w_exp=False):
         # edges: (concept1, concept2) -> AmrEdge
         # exp_edges: (concept1, concept2) -> AmrEdge
         body_nodes, body_root_nodes, body_edges, body_exp_edges = body_corpus[curr_filename]
-        # print body_nodes
-        # print body_root_nodes
-        # print body_edges
-        # print body_exp_edges
 
         summ_nodes, _, summ_edges, _ = summ_corpus[curr_filename]
         num_summ_nodes = len(summ_nodes)
