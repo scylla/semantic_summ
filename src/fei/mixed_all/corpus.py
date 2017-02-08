@@ -38,6 +38,11 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
 
             # print s_nodes
             # print s_edges
+            print "file info ........................................."
+            print curr_filename
+            print "root nodes :: " + str(len(r_nodes))
+            print r_nodes
+
 
 
             outfile.write('%s\n' % curr_filename)
@@ -76,6 +81,7 @@ def buildCorpus(body_file, summ_file, w_exp=False):
     # print "summary ends -----------------------------------------------------------------"
     # print summ_corpus
     for curr_filename in body_corpus:
+        print curr_filename
         # sanity check
         if curr_filename not in summ_corpus:
             logger.error('[no summary sentences]: %s' % curr_filename)
@@ -299,13 +305,19 @@ def loadFile(input_filename):
                 # merge edges
                 edge_indices = {} # index edge by concepts
                 for edge in edges:
+
                     # update node linkage
                     if edge.node1 in redirect_dict:
                         edge.node1 = redirect_dict[edge.node1]
                     if edge.node2 in redirect_dict:
                         edge.node2 = redirect_dict[edge.node2]
+                    # print "edge relations .............................................................................."
+                    # print edge.node1.concept
+                    # print " -------------------------------------------------------------------------------------------- "
+                    # print edge.node2.concept
 
                     curr_anchor = tuple((edge.node1.concept, edge.node2.concept)) # ignore relation
+                    # print curr_anchor
                     edge_indices[curr_anchor] = edge
 
                     if curr_anchor in doc_edges:
@@ -356,7 +368,7 @@ def loadFile(input_filename):
                 # print "fields ::::::: "
                 for field in fields[1:]:
                     tokens = field.split()
-                    # print tokens
+                    # print field
                     info_name = tokens[0]
                     info_body = ' '.join(tokens[1:])
                     info_dict[info_name] = info_body

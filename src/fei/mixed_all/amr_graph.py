@@ -435,14 +435,31 @@ if __name__ == '__main__':
                             :mod (n2 / news
                                   :mod (m3 / military))))))
     '''
+    graph_string = '''
+    (l / launch-01
+      :ARG1 (p / process
+            :mod (l2 / long)
+            :ARG0-of (t / try-01
+                  :ARG1 (a / and
+                        :op1 (c3 / control-01
+                              :ARG1 (a2 / arm))
+                        :op2 (r / reduce-01
+                              :ARG1 a)
+                        :location (w / world-region :name (n / name :op1 "Balkans")
+                              :ARG1-of (e / embattle-01)))))
+      :mod (f / formal)
+      :time (d / date-entity :day 18 :month 12 :year 1995)
+      :location (c / city :name (n2 / name :op1 "Bonn")
+            :location (c2 / country :name (n3 / name :op1 "Germany"))))
+    '''
 
     g = AmrGraph()
     tokens = graph_string.split()
 
     nodes, edges = g.getCollapsedNodesAndEdges(tokens)
-    # print
+    print "nodes ......................."
     for node in nodes: print node
-    # print
+    print "edges ......................."
     for edge in edges: print '%s (%s)-> %s' % (edge.node1, edge.relation, edge.node2)
 
 
