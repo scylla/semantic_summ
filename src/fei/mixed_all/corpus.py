@@ -42,6 +42,7 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
             print curr_filename
             print "root nodes :: " + str(len(r_nodes))
             print r_nodes
+            print my_nodes
 
 
 
