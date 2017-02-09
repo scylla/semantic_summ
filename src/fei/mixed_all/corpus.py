@@ -16,7 +16,17 @@ Instance = namedtuple('Instance', 'filename, nodes, edges, gold')
 
 class GlobalNodeEdgeInfo(object):
     def __init__(self):
+        self.node_labels = {} # int to string map
+        self.inverse_node_labels = {} # invert node labels
+        self.edge_labels = {} # tuple to string map
+        self.edge_relations = {} # list of all egde relations possible and received from data
+        self.node_idx = 0
+        self.edges_idx = 0
         return
+
+#global edge node info
+global_info = GlobalNodeEdgeInfo()
+text_graph_dict = {}
 
 class NodeProperties(object):
     def __init__(self):
@@ -36,7 +46,7 @@ class TextGraph(object):
         for k_edge, v_edge in edge_list.iteritems():
             if k_edge[0] not in self.graph:
                 self.graph[k_edge[0]] = NodeProperties()
-            self.graph[k_edge[0]].adjacency_list.append(k_edge[1])
+            self.graph[k_edge[0]].adjacency_list.append((k_edge[1], v_edge))
 
         all_nodes, _, root_nodes = nodes
 
@@ -45,6 +55,12 @@ class TextGraph(object):
             if r_node[0] not in self.graph:
                 self.graph[r_node[0]] = NodeProperties()
             self.graph[r_node[0]].is_root = True
+
+        # add node label info
+        for k_node, v_node in all_nodes.iteritems():
+            if k_node[0] not in global_info.node_labels:
+                global_info.node_labels[k_node[0]] = v_node
+
 
 def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
     """
@@ -80,6 +96,7 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
                     tag = 1
                 outfile.write('%d %s %s\n' % (tag, k_node, v_node))
 
+
             for k_edge, v_edge in my_edges.iteritems():
                 tag = 0
                 # print v_edge
@@ -89,16 +106,14 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
                 outfile.write('%d %s %s\n' % (tag, k_edge, v_edge))
 
             tGraph = TextGraph()
-            # print type(my_nodes)
-            # return
             tGraph.createGraph(my_edges, inst.nodes)
-            return
+            text_graph_dict[curr_filename] = tGraph
 
     # total selected nodes and edges
-    logger.debug('[total_s_nodes]: %d' % total_s_nodes)
-    logger.debug('[total_s_edges]: %d' % total_s_edges)
-    logger.debug('[total_body_nodes]: %d' % total_body_nodes)
-    logger.debug('[total_body_edges]: %d' % total_body_edges)
+    # logger.debug('[total_s_nodes]: %d' % total_s_nodes)
+    # logger.debug('[total_s_edges]: %d' % total_s_edges)
+    # logger.debug('[total_body_nodes]: %d' % total_body_nodes)
+    # logger.debug('[total_body_edges]: %d' % total_body_edges)
     return
 
 def buildCorpus(body_file, summ_file, w_exp=False):
@@ -129,7 +144,7 @@ def buildCorpus(body_file, summ_file, w_exp=False):
         num_summ_nodes = len(summ_nodes)
         num_summ_edges = len(summ_edges)
 
-        node_idx = 0
+        # node_idx = 0
         node_indices = {}
 
         my_nodes = {}    # my_nodes: (1,) -> AmrNode
@@ -137,13 +152,20 @@ def buildCorpus(body_file, summ_file, w_exp=False):
         r_nodes = set() # r_ndoes: (1,), (2,), ...
 
         for anchor, node in body_nodes.iteritems():
-            node_idx += 1
-            my_nodes[(node_idx,)] = node
-            node_indices[anchor[0]] = node_idx
+            local_idx = 0
+            if anchor[0] in global_info.inverse_node_labels:
+                local_idx = global_info.inverse_node_labels[anchor[0]]
+            else :
+                global_info.node_idx += 1
+                local_idx = global_info.node_idx
+                global_info.node_labels[local_idx] = anchor[0]
+
+            my_nodes[(local_idx,)] = node
+            node_indices[anchor[0]] = local_idx
             # node is selected if concept appears in summary
             # node is root node if it appears as root of ANY sentence
-            if anchor in summ_nodes: s_nodes.add((node_idx,))
-            if anchor in body_root_nodes: r_nodes.add((node_idx,))
+            if anchor in summ_nodes: s_nodes.add((local_idx,))
+            if anchor in body_root_nodes: r_nodes.add((local_idx,))
 
         my_edges = {}    # my_edges: (1,2) -> AmrEdge
         s_edges = set() # s_edges: (1,2), (3,5), ...
@@ -155,6 +177,7 @@ def buildCorpus(body_file, summ_file, w_exp=False):
                 idx1 = node_indices[anchor[0]]
                 idx2 = node_indices[anchor[1]]
                 my_edges[(idx1, idx2)] = edge
+                global_info.edge_relations.add(edge.relation)
                 # edge is selected if concept pair appears in summary
                 if anchor in summ_edges: s_edges.add((idx1, idx2))
 
@@ -163,6 +186,11 @@ def buildCorpus(body_file, summ_file, w_exp=False):
                 idx1 = node_indices[anchor[0]]
                 idx2 = node_indices[anchor[1]]
                 my_edges[(idx1, idx2)] = edge
+                if edge.relation in global_info.edge_relations:
+                    global_info.edge_relations[edge.relation] += 1
+                else:
+                    global_info.edge_relations[edge.relation] = 1
+
                 if anchor in summ_edges: s_edges.add((idx1, idx2))
                 # print edge
 #             for anchor, edge in body_exp_edges.iteritems():
@@ -412,6 +440,11 @@ def loadFile(input_filename):
     # print "-----------------------------------------------------------------------------------------------------------------"
     return corpus
 
+def print_graph_stats():
+    print "printing graph stats ::"
+    print "distinct node count ::", len(global_info.node_labels)
+    print "distinct edge labels ::", len(global_info.edge_relations)
+
 if __name__ == '__main__':
 
     input_dir = '/Users/user/Data/SemanticSumm/Proxy/gold/split/dev'
@@ -422,9 +455,21 @@ if __name__ == '__main__':
     input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy'
     body_file = 'test.txt'
     summ_file = 'alignedsum.txt'
+
+    input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/train'
+    body_file = 'amr-release-1.0-cleaned-proxy.aligned'
+    summ_file = 'amr-release-1.0-cleaned-summary.aligned'
+
     buildCorpusAndWriteToFile(os.path.join(input_dir, body_file),
                               os.path.join(input_dir, summ_file),
                               w_exp=True, output_file='output_file')
+    print_graph_stats()
+    print " ----------------------------------------------------------------------------------------------- "
+    idx = 1
+    for key, val in global_info.edge_relations.iteritems():
+        print idx, key, val
+        idx += 1
+
 
 
 
