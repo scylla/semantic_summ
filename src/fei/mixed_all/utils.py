@@ -3,6 +3,22 @@
 
 import logging
 
+class Queue:
+    def __init__(self):
+        self.items = []
+
+    def isEmpty(self):
+        return self.items == []
+
+    def enqueue(self, item):
+        self.items.insert(0,item)
+
+    def dequeue(self):
+        return self.items.pop()
+
+    def size(self):
+        return len(self.items)
+
 def getLogger(log_name='', log_file='file.log'):
     """
     get logger
@@ -17,13 +33,13 @@ def getLogger(log_name='', log_file='file.log'):
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         logger.addHandler(stream_handler)
-    
+
         # add file handler
         file_handler_info = logging.FileHandler(log_file, mode='w')
         file_handler_info.setFormatter(formatter)
         file_handler_info.setLevel(logging.DEBUG)
         logger.addHandler(file_handler_info)
-    
+
         logger.setLevel(logging.DEBUG)
 
     return logger

@@ -9,10 +9,13 @@ from amr_graph import AmrEdge
 from amr_graph import AmrGraph
 from amr_graph import NodeSource, EdgeSource
 from utils import getLogger
+from utils import Queue
 
 logger = getLogger()
 
 Instance = namedtuple('Instance', 'filename, nodes, edges, gold')
+_EMPTY = "_EMPTY_"
+_SPACE = " "
 
 class GlobalNodeEdgeInfo(object):
     def __init__(self):
@@ -23,6 +26,17 @@ class GlobalNodeEdgeInfo(object):
         self.node_idx = 0
         self.edges_idx = 0
         return
+
+    def get_sorted_relations_list(self):
+        relations_list = [key for key in sorted(self.edge_relations)]
+        return relations_list
+
+    def get_attribute_dict(self):
+        attribute_dict = {}
+        for key in sorted(self.edge_relations):
+            # print key
+            attribute_dict[key] = _EMPTY
+        return attribute_dict
 
 #global edge node info
 global_info = GlobalNodeEdgeInfo()
@@ -39,27 +53,67 @@ class TextGraph(object):
         return
 
     def createGraph(self, edge_list, nodes):
-        self.graph = {}
-        self.roots = []
+        self.graph = {} # dictionary of node properties
+        self.roots = [] # sentence roots for current graph
 
         # update adjacency list
         for k_edge, v_edge in edge_list.iteritems():
             if k_edge[0] not in self.graph:
                 self.graph[k_edge[0]] = NodeProperties()
             self.graph[k_edge[0]].adjacency_list.append((k_edge[1], v_edge))
+            if k_edge[1] not in self.graph:
+                self.graph[k_edge[1]] = NodeProperties()
 
         all_nodes, _, root_nodes = nodes
 
-        #update root nodes
+        # update root nodes
         for r_node in root_nodes:
             if r_node[0] not in self.graph:
                 self.graph[r_node[0]] = NodeProperties()
             self.graph[r_node[0]].is_root = True
+            self.roots.append(r_node[0])
 
         # add node label info
         for k_node, v_node in all_nodes.iteritems():
             if k_node[0] not in global_info.node_labels:
                 global_info.node_labels[k_node[0]] = v_node
+
+    # return linearized representation
+    def linearize_level_ordered(self, level = 1):
+        graph_str = ''
+        bfs_queue = Queue()
+        cur_level_count = 0
+        visited = {key:False for key in self.graph}
+
+        for root in self.roots:
+            bfs_queue.enqueue(root)
+            cur_level_count += 1
+
+        while not bfs_queue.isEmpty() and level > 0:
+            next_level_count = 0
+            print "on level ", level
+            while cur_level_count > 0:
+                cur_item = bfs_queue.dequeue()
+                if not visited[cur_item]:
+                    visited[cur_item] = True
+                    graph_str += global_info.node_labels[cur_item] + _SPACE
+                    attribute_dict = global_info.get_attribute_dict()
+                    for neighbour in self.graph[cur_item].adjacency_list:
+                        next_level_count += 1
+                        bfs_queue.enqueue(neighbour[0])
+                        attribute_dict[neighbour[1].relation] = global_info.node_labels[neighbour[0]]
+                    for k in sorted(attribute_dict):
+                        graph_str += k + _SPACE
+                        graph_str += attribute_dict[k] + _SPACE
+
+                cur_level_count -= 1
+            cur_level_count = next_level_count
+            level -= 1
+
+        return graph_str
+
+    def linearize_depth_ordered(self, depth = 1):
+        return
 
 
 def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
@@ -84,9 +138,9 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
             total_body_nodes += len(my_nodes)
             total_body_edges += len(my_edges)
 
-            print "file info ........................................."
-            print curr_filename
-            print "root nodes :: " + str(len(r_nodes))
+            # print "file info ........................................."
+            # print curr_filename
+            # print "root nodes :: " + str(len(r_nodes))
 
             outfile.write('%s\n' % curr_filename)
             for k_node, v_node in my_nodes.iteritems():
@@ -105,8 +159,13 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
                     tag = 1
                 outfile.write('%d %s %s\n' % (tag, k_edge, v_edge))
 
+            # for k in my_edges:
+                # print my_edges[k].relation
+
+            # return
             tGraph = TextGraph()
             tGraph.createGraph(my_edges, inst.nodes)
+            print tGraph.linearize_level_ordered()
             text_graph_dict[curr_filename] = tGraph
 
     # total selected nodes and edges
@@ -456,9 +515,9 @@ if __name__ == '__main__':
     body_file = 'test.txt'
     summ_file = 'alignedsum.txt'
 
-    input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/train'
-    body_file = 'amr-release-1.0-cleaned-proxy.aligned'
-    summ_file = 'amr-release-1.0-cleaned-summary.aligned'
+    # input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/train'
+    # body_file = 'amr-release-1.0-cleaned-proxy.aligned'
+    # summ_file = 'amr-release-1.0-cleaned-summary.aligned'
 
     buildCorpusAndWriteToFile(os.path.join(input_dir, body_file),
                               os.path.join(input_dir, summ_file),
@@ -467,8 +526,9 @@ if __name__ == '__main__':
     print " ----------------------------------------------------------------------------------------------- "
     idx = 1
     for key, val in global_info.edge_relations.iteritems():
-        print idx, key, val
+        # print idx, key, val
         idx += 1
+    # print global_info.get_sorted_relations_list()
 
 
 
