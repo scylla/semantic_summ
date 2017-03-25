@@ -13,7 +13,7 @@ logger = getLogger()
 
 
 # information obtained from file
-NodeSource = namedtuple('NodeSource', 'graph_idx, start_idx, end_idx, word_str, filename, line_num, sentence')
+NodeSource = namedtuple('NodeSource', 'graph_idx, start_idx, end_idx, word_str, filename, line_num, sentence, amr_str')
 EdgeSource = namedtuple('EdgeSource', 'relation, filename, line_num, sentence')
 
 class AmrNode(object):
@@ -232,9 +232,6 @@ class AmrGraph(object):
 
             elif t.endswith(')'):
                 tokens[curr_idx] = t[:-1]
-                # print "edges :: "
-                # print edges
-                # print tokens[curr_idx]
                 return (edges, curr_idx)
 
             elif t.startswith(':'):
@@ -321,7 +318,14 @@ class AmrGraph(object):
             if start_collapse == True:
                 # remove ending brackets, concatenate tokens
                 t_clean = re.sub(r'\)+$', '', t)
-                curr_concept = '%s_%s' % (curr_concept, t_clean)
+                if curr_concept.find('name') != -1:
+                    t_clean = re.sub(r'^:op\d+', "", t_clean)
+                    t_clean = re.sub(r'"', "", t_clean)
+                    curr_concept = '%s %s' % (curr_concept, t_clean)
+
+                if curr_concept.find('date-entity') != -1:
+                    t_clean = re.sub(r'^:', "", t_clean)
+                    curr_concept = '%s %s' % (curr_concept, t_clean)
 
                 if t.endswith(')'):
                     node_indices[curr_short_hnd].concept = curr_concept
@@ -339,7 +343,7 @@ class AmrGraph(object):
         for edge in edges:
             # right-hand-side node linked only to current edge
             if edge.relation == 'name' and node_counts[edge.node2.short_hnd] == 1:
-                edge.node1.concept += '_' + edge.node2.concept
+                edge.node1.concept += ' ' + edge.node2.concept
                 if edge.node2.short_hnd in node_indices:
                     del node_indices[edge.node2.short_hnd]
             else: new_edges.append(edge)
