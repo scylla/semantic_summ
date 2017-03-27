@@ -186,7 +186,7 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
 
 
 # utility function to separate out the data from amr file for textsum
-def genTextSumFormatData(body_file, summ_file):
+def genTextSumFormatData(body_file, summ_file, suffix_str):
 
     logger.debug('building corpus [body file]: %s' % body_file)
     logger.debug('building corpus [summ file]: %s' % summ_file)
@@ -213,6 +213,11 @@ def genTextSumFormatData(body_file, summ_file):
                 for i in xrange(len(sources)):
                     corpus_dict[curr_filename].appendSummText(sources[i].sentence)
                     corpus_dict[curr_filename].appendSummAmr(sources[i].amr_str)
+
+    import pickle
+    filehandler = open("amr_meta_data" + suffix_str + ".pkl","wb")
+    pickle.dump(corpus_dict,filehandler)
+    filehandler.close()
 
 
 
@@ -313,7 +318,7 @@ def loadFile(input_filename):
     return corpus of nodes and edges
     """
     graph_str = ''  # AMR parse
-    graph_str_aligned = '' # Aligned graph str
+    graph_str_aligned = [] # Aligned graph str parts
     info_dict = {}  # AMR meta info
 
     doc_filename = ''
@@ -353,7 +358,7 @@ def loadFile(input_filename):
 
                     # add source info to nodes
                     for node in nodes:
-                        node_source = NodeSource(node.graph_idx, 0, 0, '', filename, line_num, sentence, graph_str_aligned.lstrip())
+                        node_source = NodeSource(node.graph_idx, 0, 0, '', filename, line_num, sentence, graph_str_aligned)
                         node.sources.append(node_source)
 
                     # add source info to edges
@@ -402,13 +407,13 @@ def loadFile(input_filename):
                             # update new node source
                             new_node_source = NodeSource(curr_node.graph_idx, new_start_idx, new_end_idx,
                                                          ' '.join(tokens[new_start_idx:new_end_idx]),
-                                                         filename, line_num, sentence, graph_str_aligned.lstrip())
+                                                         filename, line_num, sentence, graph_str_aligned)
                             curr_node.sources.append(new_node_source)
 
                     # add source info to [unaligned] nodes
                     for node in nodes:
                         if node.sources: continue
-                        node_source = NodeSource(node.graph_idx, 0, 0, '', filename, line_num, sentence, graph_str_aligned.lstrip())
+                        node_source = NodeSource(node.graph_idx, 0, 0, '', filename, line_num, sentence, graph_str_aligned)
                         node.sources.append(node_source)
 
                 # start of new file
@@ -503,7 +508,7 @@ def loadFile(input_filename):
 
                 # clear cache
                 graph_str = ''
-                graph_str_aligned = ''
+                graph_str_aligned = []
                 info_dict = {}
                 continue
 
@@ -517,7 +522,7 @@ def loadFile(input_filename):
                 continue
 
             graph_str += line
-            graph_str_aligned += " " + line.lstrip()
+            graph_str_aligned.append(line)
 
     # add nodes and edges to the last file
     corpus[doc_filename] = (doc_nodes, doc_root_nodes, doc_edges, doc_exp_edges)
@@ -540,17 +545,18 @@ if __name__ == '__main__':
 
     # body_file = 'aligned-amr-release-1.0-dev-proxy-body.txt'
     # summ_file = 'aligned-amr-release-1.0-dev-proxy-summary.txt'
-    input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy'
-    body_file = 'test.txt'
-    summ_file = 'alignedsum.txt'
+    # input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy'
+    # body_file = 'test.txt'
+    # summ_file = 'alignedsum.txt'
 
-    # input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/train'
-    # body_file = 'amr-release-1.0-cleaned-proxy.aligned'
-    # summ_file = 'amr-release-1.0-cleaned-summary.aligned'
+    input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/dev'
+    body_file = 'amr-release-1.0-cleaned-proxy.aligned'
+    summ_file = 'amr-release-1.0-cleaned-summary.aligned'
+
     _depth = int(args["depth"])
-
+    suffix_str = "dev"
     genTextSumFormatData(os.path.join(input_dir, body_file),
-                         os.path.join(input_dir, summ_file))
+                         os.path.join(input_dir, summ_file), suffix_str)
 
     if _depth:
         exit(0)
