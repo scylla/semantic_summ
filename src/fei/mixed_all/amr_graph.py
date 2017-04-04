@@ -465,10 +465,3 @@ if __name__ == '__main__':
     for node in nodes: print node
     print "edges ......................."
     for edge in edges: print '%s (%s)-> %s' % (edge.node1, edge.relation, edge.node2)
-
-
-
-
-
-
-
