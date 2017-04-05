@@ -6,7 +6,7 @@ import codecs
 import pickle
 import argparse
 
-from collections import namedtuple
+from collections import namedtuple, Counter
 from amr_graph import AmrEdge
 from amr_graph import AmrGraph
 from amr_graph import NodeSource, EdgeSource
@@ -157,14 +157,16 @@ class TextGraph(object):
 
         linearized_graph_rep = ''
         if is_root:
-            linearized_graph_rep += "SENT" + str(sent_num) + "( " + global_info.node_labels[cur_node] + _SPACE
+            # linearized_graph_rep += "SENT" + str(sent_num) + "( " + global_info.node_labels[cur_node] + _SPACE
+            linearized_graph_rep += "--TOP( " + global_info.node_labels[cur_node] + _SPACE
         else:
             linearized_graph_rep += p_edge + "( " + global_info.node_labels[cur_node] + _SPACE
         for neighbour in self.graph[cur_node].adjacency_list:
             linearize_amr_child = self.level_linearize_amr_graph(neighbour[0], neighbour[1], False, level-1, sent_num)
             linearized_graph_rep += linearize_amr_child
         if is_root:
-            linearized_graph_rep += ")SENT" + str(sent_num) + _SPACE
+            # linearized_graph_rep += ")SENT" + str(sent_num) + _SPACE
+            linearized_graph_rep += ")TOP--" + _SPACE
         else:
             linearized_graph_rep += ")" + p_edge + _SPACE
         return linearized_graph_rep
@@ -174,14 +176,53 @@ class TextGraph(object):
             linear_out = self.level_linearize_amr_graph(root, _EMPTY, True, _depth, sent_num)
             linear_out = _SPACE.join(linear_out.split())
             print linear_out
-        return        
+
+    def create_text_sum_data(self, _depth):
+        sent_list = []
+        summ_list = []
+        for sent_num, root in enumerate(self.roots):
+            linear_sent = self.linearize_amr_graph(root, _EMPTY, True)
+            linear_sent = _SPACE.join(linear_sent.split())
+            sent_list.append(linear_sent)
+            linear_summ = self.level_linearize_amr_graph(root, _EMPTY, True, _depth, sent_num)
+            linear_summ = _SPACE.join(linear_summ.split())
+            summ_list.append(linear_summ)
+        return (sent_list, summ_list)
 
 
-def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
+    def format_amr_data(self, amr_file, tok_file, meta_file, output_file):
+        meta_file_handle = open(meta_file,'rb')
+        meta_list = pickle.load(meta_file_handle)
+        meta_file_handle.close()
+        sent_id = 0
+        _IDSEQ = "# ::id REVIEW"
+        _SENTSEQ = "# ::snt "
+        _total_sent = 0
+        with codecs.open(tok_file, 'rb', 'utf-8') as tokens_file:
+            with codecs.open(amr_file, 'rb', 'utf-8') as amr_file:
+                with codecs.open(output_file, 'wb', 'utf-8') as out_file:
+                    for x in meta_list:
+                        _total_sent += x
+                        for x_i in xrange(x):
+                            out_file.write("%s \n" % (_IDSEQ + str(sent_id) + '.' + str(x_i)))
+                            token = tokens_file.readline().lstrip().rstrip()
+                            out_file.write("%s \n" % (_SENTSEQ + token))
+                            amr_line = amr_file.readline().lstrip().rstrip()
+                            while amr_line != '':
+                                out_file.write("%s \n" % (amr_line))
+                                amr_line = amr_file.readline().lstrip().rstrip()
+                            out_file.write("\n")
+                        sent_id += 1
+
+        print _total_sent                    
+
+
+def buildLinearCorpusAndWriteToFile(body_file, output_file):
     """
     build corpus and write it to file
     """
-    corpus = buildCorpus(body_file, summ_file, w_exp)
+    corpus = buildLinearCorpus(body_file)
+
     total_s_nodes = 0
     total_s_edges = 0
     total_body_nodes = 0
@@ -217,6 +258,49 @@ def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
             text_graph_dict[curr_filename] = tGraph
 
     return
+
+def buildLinearCorpus(body_file):
+
+    logger.debug('building corpus [body file]: %s' % body_file)
+
+    corpus = []
+    body_corpus = loadFile(body_file)
+
+    for curr_filename in body_corpus:
+
+        body_nodes, body_root_nodes, body_edges, body_exp_edges = body_corpus[curr_filename]
+
+        node_indices = {}
+
+        my_nodes = {}    # my_nodes: (1,) -> AmrNode
+        s_nodes = set() # s_nodes: (1,), (3,), ...
+        r_nodes = set() # r_ndoes: (1,), (2,), ...
+
+        for anchor, node in body_nodes.iteritems():
+            global_info.node_idx += 1
+            my_nodes[(global_info.node_idx,)] = node
+            node_indices[anchor[0]] = global_info.node_idx
+            global_info.node_labels[global_info.node_idx] = anchor[0]
+            if anchor in body_root_nodes: r_nodes.add((global_info.node_idx,))
+
+        my_edges = {}    # my_edges: (1,2) -> AmrEdge
+        s_edges = set() # s_edges: (1,2), (3,5), ...
+
+        for anchor, edge in body_edges.iteritems():
+            idx1 = node_indices[anchor[0]]
+            idx2 = node_indices[anchor[1]]
+            my_edges[(idx1, idx2)] = edge
+            if edge.relation in global_info.edge_relations:
+                global_info.edge_relations[edge.relation] += 1
+            else:
+                global_info.edge_relations[edge.relation] = 1
+
+        inst = Instance(curr_filename, (my_nodes, s_nodes, r_nodes), (my_edges, s_edges),
+                        (0, 0))
+        corpus.append(inst)
+
+    # return list of Instances
+    return corpus
 
 
 # utility function to separate out the data from amr file for textsum
@@ -374,7 +458,6 @@ def loadFile(input_filename):
                 g = AmrGraph()
                 nodes, edges = g.getCollapsedNodesAndEdges(graph_str.split())
 
-                # print graph_str_aligned.lstrip()
 
                 # index nodes by graph_idx
                 node_indices = {}
@@ -574,53 +657,36 @@ if __name__ == '__main__':
     ap.add_argument("-d", "--depth", help="depth of graph to traverse")
     args = vars(ap.parse_args())
 
-    # input_dir = '/Users/user/Data/SemanticSumm/Proxy/gold/split/dev'
-
-    # body_file = 'aligned-amr-release-1.0-dev-proxy-body.txt'
-    # summ_file = 'aligned-amr-release-1.0-dev-proxy-summary.txt'
-    input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy'
-    body_file = 'test.txt'
-    summ_file = 'alignedsum.txt'
-
-    # input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/dev'
-    # body_file = 'amr-release-1.0-cleaned-proxy.aligned'
-    # summ_file = 'amr-release-1.0-cleanessd-summary.aligned'
+    meta_file = "/Users/amit/Desktop/Thesis/jamr_data_parser/10k_review_meta.pkl" 
+    output_file = "/Users/amit/Desktop/Thesis/jamr_data_parser/10000_yelp_jamr"
+    amr_file = "/Users/amit/Desktop/Thesis/jamr_data_parser/amrs_data_10000_raw"
+    tok_file = "/Users/amit/Desktop/Thesis/jamr_data_parser/amrs_data_10000_tokensraw"
 
     _depth = int(args["depth"])
-    suffix_str = "dev"
-    # genTextSumFormatData(os.path.join(input_dir, body_file),
-    #                      os.path.join(input_dir, summ_file), suffix_str)
+    
+    # align data in jamr format    
+    # text_graph = TextGraph()
+    # text_graph.format_amr_data(amr_file, tok_file, meta_file, output_file)
 
-    # if _depth:
-    #     exit(0)
 
-    buildCorpusAndWriteToFile(os.path.join(input_dir, body_file),
-                              os.path.join(input_dir, summ_file),
-                              w_exp=True, output_file='output_file')
+    # input_dir = '/Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy'
+    # body_file = 'test.txt'
+    input_dir = '/Users/amit/Desktop/Thesis/jamr_data_parser'
+    body_file = '10000_yelp_jamr'
+
+    buildLinearCorpusAndWriteToFile(os.path.join(input_dir, body_file), output_file='output_file')
 
     print_graph_stats()
 
-    # print "nodes info ----------------------------------------------------------------------------"
-    # for k in global_info.node_labels:
-        # print k, global_info.node_labels[k]
-    # print "node info ends -------------------------------------------------------------------------"
-
-    # print "edge info ------------------------------------------------------------------------------"
-    # for k in sorted(global_info.edge_relations):
-        # print k
-    # print "edge info ends -------------------------------------------------------------------------"
-
     linearized_graph_dict = {}
 
+    textsum_corpus_dict = {}
+    all_data = []
+    amr_vocab = None
     with codecs.open("linearized_graph_rep", 'w', 'utf-8') as outfile:
         for filename in text_graph_dict:
-            # linearized_graph_dict[filename] = text_graph_dict[filename].linearize_level_ordered(_depth)
-            # print linearized_graph_dict[filename]
-            text_graph_dict[filename].linearize_amr_graphs()
-            text_graph_dict[filename].get_linear_summary(_depth)
-            # outfile.write("%s\n" % filename)
-            # outfile.write("%s\n" % linearized_graph_dict[filename])
-
-    # linear_file = open("linear_sent.pkl","wb")
-    # pickle.dump(linearized_graph_dict, linear_file)
-    # linear_file.close()
+            sent_list, _ = text_graph_dict[filename].create_text_sum_data(_depth)
+            for sent in sent_list:
+                all_data += all_data + sent.split()
+        amr_vocab = Counter(all_data)
+        print len(amr_vocab)        
