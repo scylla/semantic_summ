@@ -3,7 +3,9 @@
 
 import logging
 
+
 class Queue:
+
     def __init__(self):
         self.items = []
 
@@ -11,13 +13,35 @@ class Queue:
         return self.items == []
 
     def enqueue(self, item):
-        self.items.insert(0,item)
+        self.items.insert(0, item)
 
     def dequeue(self):
         return self.items.pop()
 
     def size(self):
         return len(self.items)
+
+
+class Stack:
+
+    def __init__(self):
+        self.items = []
+
+    def isEmpty(self):
+        return self.items == []
+
+    def push(self, item):
+        self.items.append(item)
+
+    def pop(self):
+        return self.items.pop()
+
+    def peek(self):
+        return self.items[len(self.items) - 1]
+
+    def size(self):
+        return len(self.items)
+
 
 def getLogger(log_name='', log_file='file.log'):
     """
@@ -43,4 +67,3 @@ def getLogger(log_name='', log_file='file.log'):
         logger.setLevel(logging.DEBUG)
 
     return logger
-

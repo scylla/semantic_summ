@@ -18,6 +18,8 @@ logger = getLogger()
 Instance = namedtuple('Instance', 'filename, nodes, edges, gold')
 _EMPTY = "_EMPTY"
 _SPACE = " "
+_BLANK = ''
+
 
 class GlobalNodeEdgeInfo(object):
     def __init__(self):
@@ -80,15 +82,7 @@ class TextGraph(object):
             if k_edge[1] not in self.graph:
                 self.graph[k_edge[1]] = NodeProperties()
 
-            # relation_str = v_edge.relation.split('-of')
             self.graph[k_edge[0]].adjacency_list.append((k_edge[1], v_edge.relation))
-
-            # removes inverse relations
-            # if len(relation_str) == 1:
-                # self.graph[k_edge[0]].adjacency_list.append((k_edge[1], relation_str[0]))
-            # else:
-                # self.graph[k_edge[1]].adjacency_list.append((k_edge[1], relation_str[0]))
-
 
         all_nodes, _, root_nodes = nodes
 
@@ -120,18 +114,9 @@ class TextGraph(object):
                         cur_level_count -= 1
                         continue
                     graph_str += global_info.node_labels[cur_item] + _SPACE
-                    attribute_dict = global_info.get_attribute_dict()
                     for neighbour in self.graph[cur_item].adjacency_list:
                         next_level_count += 1
                         bfs_queue.enqueue(neighbour[0])
-                        attribute_dict[neighbour[1]] = global_info.node_labels[neighbour[0]]
-                    for k in sorted(attribute_dict):
-                        graph_str += k + _SPACE
-                        if k == 'time':
-                            graph_str +=  (attribute_dict[k] if attribute_dict[k] == _EMPTY else attribute_dict[k][12:]) + _SPACE
-                        else:
-                            graph_str += attribute_dict[k] + _SPACE
-
 
                 cur_level_count -= 1
             cur_level_count = next_level_count
@@ -141,6 +126,55 @@ class TextGraph(object):
 
     def linearize_depth_ordered(self, depth = 1):
         return
+
+    def linearize_amr_graphs(self):
+        for root in self.roots:
+            linear_out = self.linearize_amr_graph(root, _EMPTY, True)
+            linear_out = _SPACE.join(linear_out.split())
+            print linear_out
+        return
+
+    # depth first amr linearization
+    def linearize_amr_graph(self, cur_node, p_edge, is_root):
+        linearized_graph_rep = ''
+        if is_root:
+            linearized_graph_rep += "--TOP( " + global_info.node_labels[cur_node] + _SPACE
+        else:
+            linearized_graph_rep += p_edge + "( " + global_info.node_labels[cur_node] + _SPACE
+        for neighbour in self.graph[cur_node].adjacency_list:
+            linearize_amr_child = self.linearize_amr_graph(neighbour[0], neighbour[1], False)
+            linearized_graph_rep += linearize_amr_child
+        if is_root:
+            linearized_graph_rep += ")TOP-- "
+        else:
+            linearized_graph_rep += ")" + p_edge + _SPACE
+        return linearized_graph_rep
+
+    # level depth first amr linearization
+    def level_linearize_amr_graph(self, cur_node, p_edge, is_root, level, sent_num):
+        if level == 0:
+            return _BLANK
+
+        linearized_graph_rep = ''
+        if is_root:
+            linearized_graph_rep += "SENT" + str(sent_num) + "( " + global_info.node_labels[cur_node] + _SPACE
+        else:
+            linearized_graph_rep += p_edge + "( " + global_info.node_labels[cur_node] + _SPACE
+        for neighbour in self.graph[cur_node].adjacency_list:
+            linearize_amr_child = self.level_linearize_amr_graph(neighbour[0], neighbour[1], False, level-1, sent_num)
+            linearized_graph_rep += linearize_amr_child
+        if is_root:
+            linearized_graph_rep += ")SENT" + str(sent_num) + _SPACE
+        else:
+            linearized_graph_rep += ")" + p_edge + _SPACE
+        return linearized_graph_rep
+
+    def get_linear_summary(self, _depth):
+        for sent_num, root in enumerate(self.roots):
+            linear_out = self.level_linearize_amr_graph(root, _EMPTY, True, _depth, sent_num)
+            linear_out = _SPACE.join(linear_out.split())
+            print linear_out
+        return        
 
 
 def buildCorpusAndWriteToFile(body_file, summ_file, w_exp, output_file):
@@ -580,8 +614,10 @@ if __name__ == '__main__':
 
     with codecs.open("linearized_graph_rep", 'w', 'utf-8') as outfile:
         for filename in text_graph_dict:
-            linearized_graph_dict[filename] = text_graph_dict[filename].linearize_level_ordered(_depth)
-            print linearized_graph_dict[filename]
+            # linearized_graph_dict[filename] = text_graph_dict[filename].linearize_level_ordered(_depth)
+            # print linearized_graph_dict[filename]
+            text_graph_dict[filename].linearize_amr_graphs()
+            text_graph_dict[filename].get_linear_summary(_depth)
             # outfile.write("%s\n" % filename)
             # outfile.write("%s\n" % linearized_graph_dict[filename])
 

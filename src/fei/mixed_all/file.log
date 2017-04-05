@@ -1,2 +1,2 @@
-DEBUG:root:building corpus [body file]: /Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/dev/amr-release-1.0-cleaned-proxy.aligned
-DEBUG:root:building corpus [summ file]: /Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/jamr/dev/amr-release-1.0-cleaned-summary.aligned
+DEBUG:root:building corpus [body file]: /Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy/test.txt
+DEBUG:root:building corpus [summ file]: /Users/amit/Desktop/Thesis/jamr/biocorpus/amr_parsing/data/amr-release-1.0-dev-proxy/alignedsum.txt
